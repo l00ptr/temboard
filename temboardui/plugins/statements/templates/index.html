@@ -6,7 +6,25 @@
 
 <div id="app">
   <div class="row mb-1">
-    <div class="col-12 d-flex justify-content-between">
+    <div class="col" v-cloak>
+      <nav aria-label="breadcrumb" class="d-inline-block">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item">
+            <a href v-on:click.prevent="database = null" v-if="database">
+              All Databases
+            </a>
+            <span v-else>All Databases</span>
+          </li>
+          <li class="breadcrumb-item" v-if="database">
+            <em class="text-muted small">Database:</em>
+            <strong>{{! database }}</strong>
+          </li>
+        </ol>
+      </nav>
+    </div>
+  </div>
+  <div class="row mb-1" v-cloak>
+    <div class="col-12 d-flex">
       <b-form-group
         label="Filter"
         label-cols-sm="3"
@@ -26,7 +44,7 @@
           </b-input-group-append>
         </b-input-group>
       </b-form-group>
-      <daterangepicker :from="from" :to="to" v-on:update="onPickerUpdate"></daterangepicker>
+      <daterangepicker class="ml-auto" :from="from" :to="to" v-on:update="onPickerUpdate"></daterangepicker>
     </div>
   </div>
   <b-table
@@ -42,15 +60,30 @@
     >
     <template v-slot:thead-top="data">
       <b-tr>
-        <b-th colspan="4"></b-th>
-        <b-th variant="secondary" colspan="2">Time</b-th>
-        <b-th colspan="4">Local Blocks</b-th>
-        <b-th variant="secondary" colspan="4">Shared Blocks</b-th>
-        <b-th colspan="2">Temp Blocks</b-th>
+        <b-th :colspan="database ? 3 : 2"></b-th>
+        <b-th class="text-center border-left" colspan="2">Time</b-th>
+        <b-th class="text-center border-left" colspan="4">Local Blocks</b-th>
+        <b-th class="text-center border-left" colspan="4">Shared Blocks</b-th>
+        <b-th class="text-center border-left" colspan="2">Temp Blocks</b-th>
       </b-tr>
     </template>
-    <template v-slot:cell(query)="data">
-      <pre class="sql" v-html="data.value"></pre>
+    <template v-slot:cell(query)="row">
+      <pre class="sql hljs" v-html="highlight(row.value)" @click="row.toggleDetails"></pre>
+    </template>
+    <template v-slot:cell(datname)="data">
+      <a href v-on:click.prevent="database=data.value">
+        {{! data.value }}
+      </a>
+    </template>
+    <template v-slot:row-details="row">
+      <b-card class="detail">
+        <b-row class="mb-2">
+          <b-col>
+            <pre class="sql hljs" v-html="highlight(row.item.query)"></pre>
+          </b-col>
+        </b-row>
+        <b-button size="sm" @click="row.toggleDetails">Hide Details</b-button>
+      </b-card>
     </template>
     <template v-slot:cell()="data">
       <span v-html="data.value"></span>

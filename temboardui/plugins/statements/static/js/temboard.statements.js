@@ -10,6 +10,7 @@ $(function() {
     router: new VueRouter(),
     data: {
       statements: [],
+      database: null,
       sortBy: 'total_time',
       filter: '',
       from: null,
@@ -23,7 +24,8 @@ $(function() {
     },
     methods: {
       fetchData: fetchData,
-      onPickerUpdate: onPickerUpdate
+      onPickerUpdate: onPickerUpdate,
+      highlight: highlight
     },
     watch: {
       fromTo: function() {
@@ -33,6 +35,16 @@ $(function() {
         })});
         this.fetchData();
       },
+      database: function() {
+        var newQueryParams = _.assign({}, this.$route.query);
+        if (!this.database) {
+          delete newQueryParams.database;
+        } else {
+          newQueryParams.database = this.database;
+        }
+        this.$router.replace({ query: newQueryParams });
+        this.fetchData();
+      }
     }
   });
 
@@ -42,11 +54,12 @@ $(function() {
   v.to = end;
 
   function fetchData() {
+    this.statements = [];
     var startDate = dateMath.parse(this.from);
     var endDate = dateMath.parse(this.to, true);
 
     $.ajax({
-      url: apiUrl,
+      url: apiUrl + (this.database ? '/' + this.database : ''),
       data: {
         start: timestampToIsoDate(startDate),
         end: timestampToIsoDate(endDate),
@@ -55,7 +68,6 @@ $(function() {
       contentType: "application/json",
       success: (function(data) {
         this.statements = data.data;
-        window.setTimeout(postCreated, 1);
 
         window.clearTimeout(refreshTimeoutId);
         if (this.from.toString().indexOf('now') != -1 ||
@@ -67,9 +79,10 @@ $(function() {
   }
 
   function getFields() {
-    return [{
-      key: 'rolname',
-      label: 'User',
+    var fields = [{
+      key: 'query',
+      label: 'Query',
+      class: 'query',
       sortable: true,
       sortDirection: 'asc'
     }, {
@@ -78,9 +91,8 @@ $(function() {
       sortable: true,
       sortDirection: 'asc'
     }, {
-      key: 'query',
-      label: 'Query',
-      class: 'query',
+      key: 'rolname',
+      label: 'User',
       sortable: true,
       sortDirection: 'asc'
     }, {
@@ -92,7 +104,7 @@ $(function() {
       key: 'total_time',
       label: 'Total',
       formatter: formatDuration,
-      class: 'text-right',
+      class: 'text-right border-left',
       sortable: true
     }, {
       key: 'mean_time',
@@ -103,7 +115,7 @@ $(function() {
     }, {
       key: 'local_blks_read',
       label: 'Read',
-      class: 'text-right',
+      class: 'text-right border-left',
       formatter: formatSize,
       sortable: true
     }, {
@@ -127,7 +139,7 @@ $(function() {
     }, {
       key: 'shared_blks_read',
       label: 'Read',
-      class: 'text-right',
+      class: 'text-right border-left',
       formatter: formatSize,
       sortable: true
     }, {
@@ -151,7 +163,7 @@ $(function() {
     }, {
       key: 'temp_blks_read',
       label: 'Read',
-      class: 'text-right',
+      class: 'text-right border-left',
       formatter: formatSize,
       sortable: true
     }, {
@@ -160,7 +172,16 @@ $(function() {
       class: 'text-right',
       formatter: formatSize,
       sortable: true
-    }]
+    }];
+
+    var ignored = ['rolname', 'query'];
+    if (this.database) {
+      ignored = ['datname'];
+    }
+
+    return _.filter(fields, function(field) {
+      return ignored.indexOf(field.key) === -1;
+    });
   }
 
   function formatDuration(value) {
@@ -174,10 +195,8 @@ $(function() {
     return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
   }
 
-  function postCreated() {
-    $('.sql').each(function(i, block) {
-      hljs.highlightBlock(block);
-    });
+  function highlight(src) {
+    return hljs.highlight('sql', src).value;
   }
 
   function onPickerUpdate(from, to) {
@@ -189,4 +208,18 @@ $(function() {
     var ndate = new Date(epochMs);
     return ndate.toISOString();
   }
+
+  /**
+   * Parse location to get start and end date
+   * If dates are not provided, falls back to the date range corresponding to
+   * the last 24 hours.
+   */
+  var start = v.$route.query.start || 'now-24h';
+  var end = v.$route.query.end || 'now';
+  start = dateMath.parse(start).isValid() ? start : moment(parseInt(start, 10));
+  end = dateMath.parse(end).isValid() ? end : moment(parseInt(end, 10));
+
+  v.from = start;
+  v.to = end;
+  v.database = v.$route.query.database;
 });
